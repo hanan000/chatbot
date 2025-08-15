@@ -10,7 +10,7 @@ An intelligent conversational AI system that engages users in role-playing conve
 - 📊 **Real-time Scoring**: Dynamic scoring system (0-100) based on keyword relevance and coverage
 - 💬 **Role-playing Conversations**: Engaging dialogues on various educational topics
 - 📈 **Conversation Management**: Context tracking and session management
-- 📋 **Structured Reports**: Detailed analysis reports in multiple formats
+- 📋 **Structured Reports**: Detailed analysis reports in a json formats
 
 ## Topics Covered
 
@@ -32,6 +32,8 @@ An intelligent conversational AI system that engages users in role-playing conve
    
    ```bash
    python3 -m venv venv
+   ```
+   ```bash
    source venv/bin/activate
    ```
 2. **Install Python dependencies**:

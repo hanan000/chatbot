@@ -20,10 +20,20 @@ An intelligent conversational AI system that engages users in role-playing conve
 4. **Successful Job Interview** - Preparation, communication skills, body language, experience
 5. **City Planning in Volcanic Areas** - Hazard mapping, evacuation routes, monitoring systems
 
-## Installation
+## Dev Setup
 
-1. **Clone or download the project files**
 
+
+
+1. **Clone the repository and install dependencies to a virtual environment:**
+   ```bash
+   git clone https://github.com/hanan000/chatbot.git
+   ```
+   
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
 2. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
@@ -74,7 +84,6 @@ FOLLOW_UP_Q_MAX_TOKENS=150
 
 ### Basic Usage
 
-**Speech Mode (Default)**:
 ```bash
 python main.py
 ```

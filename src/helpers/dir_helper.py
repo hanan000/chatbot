@@ -8,7 +8,7 @@ from os import path
 class DirectoryHelper:
     """A class for handling directory operations for the chatbot project."""
 
-    PROJECT_DIR = path.dirname(path.abspath(__file__ + "/../"))
+    PROJECT_DIR = path.dirname(path.dirname(path.dirname(path.abspath(__file__))))
     # Storage directory paths
     STORAGE_DIR = PROJECT_DIR + "/storage"
     LOGS_DIR = STORAGE_DIR + "/logs"

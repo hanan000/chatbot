@@ -151,8 +151,6 @@ chatbot/
 │   ├── conversations/                  # Saved conversation sessions (JSON)
 │   └── logs/
 │       └── logs.log                    # Main application logs
-├── tests/                              # Test files
-│   └── test_keyword_analyzer.py        # Keyword analyzer tests
 └── venv/                              # Virtual environment (if created locally)
 ```
 
@@ -163,16 +161,14 @@ chatbot/
 - OpenAI API access
 - Microphone and speakers (for speech mode)
 - Internet connection
-- ~50MB disk space for dependencies
+
+## Future Improvements
+
+   - Add proper Python package structure (`__init__.py` files)
+   - Include pytest in requirements.txt for testing framework
+   - Multi-language support for speech
+   - Web or Mobile interface option
+
 
 ## License
 
-This project is created for educational purposes. Please ensure you comply with OpenAI's usage policies when using their API.
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Verify all dependencies are installed
-3. Test with `--text` mode first
-4. Check your OpenAI API key and credits

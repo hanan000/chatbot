@@ -40,11 +40,6 @@ An intelligent conversational AI system that engages users in role-playing conve
    ```bash
    brew install portaudio
    ```
-   
-   **For Windows**:
-   ```bash
-   # PyAudio should install automatically with pip
-   ```
 
 4. **Set up environment variables**:
    ```bash
@@ -60,9 +55,12 @@ An intelligent conversational AI system that engages users in role-playing conve
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
-MODEL_NAME=gpt-3.5-turbo
-SPEECH_RECOGNITION_TIMEOUT=5
-SPEECH_PHRASE_TIMEOUT=2
+MODEL_NAME=gpt-4.1-nano
+TEMPERATURE=0.7
+MAX_TOKENS=500
+TOP_P=1
+FOLLOW_UP_Q_TEP=0.8
+FOLLOW_UP_Q_MAX_TOKENS=150
 ```
 
 ### OpenAI API Key

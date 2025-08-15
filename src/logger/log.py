@@ -2,7 +2,7 @@ import os
 
 from loguru import logger
 
-from helpers.dir_helper import DirectoryHelper
+from src.helpers.dir_helper import DirectoryHelper
 
 
 class LOG:

@@ -265,8 +265,11 @@ class RolePlayChatbot:
                         LOG.exception("Conversation interrupted by user.")
                         break
                     
-                    if user_input.lower().strip() in ['quit', 'exit', 'stop', 'end']:
-                        LOG.exception("Ending conversation as requested.")
+                    # Check if any exit words are contained in the user input
+                    exit_words = ['quit', 'exit', 'stop', 'end']
+                    user_input_clean = user_input.lower().strip()
+                    if any(word in user_input_clean for word in exit_words):
+                        LOG.info("Ending conversation as requested.")
                         break
                     
                     if not user_input.strip():

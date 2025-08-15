@@ -1,0 +1,8 @@
+openai==1.99.9
+python-dotenv==1.0.1
+pyaudio==0.2.14
+langchain-core==0.3.59
+langchain-openai==0.3.17
+pydantic==2.5.3
+loguru==0.7.3
+pygame==2.5.2

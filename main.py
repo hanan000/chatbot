@@ -11,7 +11,7 @@ from src.utils import get_conf
 
 def create_directories():
 
-    Path(DirectoryHelper.STORAGE_DIR + '/storage').mkdir(exist_ok=True)
+    Path(DirectoryHelper.PROJECT_DIR + '/storage').mkdir(exist_ok=True)
     LOG.info("Created storage directory for saving data")
 
 def display_banner():

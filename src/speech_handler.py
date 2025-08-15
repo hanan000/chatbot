@@ -47,7 +47,7 @@ class SpeechHandler:
             try:
                 response = self.client.audio.speech.create(
                     model="tts-1",
-                    voice="alloy",
+                    voice="nova",  # Using nova voice which is clear English
                     input=text
                 )
                 
@@ -119,7 +119,8 @@ class SpeechHandler:
                     transcript = self.client.audio.transcriptions.create(
                         model="whisper-1",
                         file=audio_file,
-                        response_format="text"
+                        response_format="text",
+                        language="en"
                     )
                 
                 os.unlink(tmp.name)

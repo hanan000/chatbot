@@ -122,7 +122,7 @@ class ConversationManager:
             scoring_result = self.keyword_analyzer.analyze_conversation(user_turns, self.current_session.topic)
             
             turn.score = scoring_result.total_score
-            turn.keyword_matches = {k: v.relevance_score for k, v in scoring_result.keyword_matches.items()}
+            turn.keyword_matches = {k: v.score for k, v in scoring_result.keyword_matches.items()}
             
             self.current_session.total_user_words += len(content.split())
         
@@ -198,8 +198,9 @@ class ConversationManager:
         """
         
         if scoring_result:
-            summary += f"Topic coverage: {scoring_result.coverage_percentage:.1f}%\n"
-            summary += f"Keywords mentioned: {len(scoring_result.keyword_matches)}/{len(self.current_session.topic.keywords)}\n"
+            coverage = (scoring_result.keywords_found / scoring_result.total_keywords) * 100
+            summary += f"Topic coverage: {coverage:.1f}%\n"
+            summary += f"Keywords mentioned: {scoring_result.keywords_found}/{scoring_result.total_keywords}\n"
         
         return summary.strip()
     
@@ -230,8 +231,10 @@ class ConversationManager:
         if duration > timedelta(minutes=10):
             return False, f"Time limit reached. Final score: {current_score:.1f}/100"
         
-        if scoring_result and scoring_result.coverage_percentage >= 60:
-            return True, f"Good progress - {scoring_result.coverage_percentage:.1f}% coverage"
+        if scoring_result:
+            coverage = (scoring_result.keywords_found / scoring_result.total_keywords) * 100
+            if coverage >= 60:
+                return True, f"Good progress - {coverage:.1f}% coverage"
         
         return True, "Continue conversation"
     
@@ -270,10 +273,12 @@ class ConversationManager:
         }
         
         if scoring_result:
+            coverage = (scoring_result.keywords_found / scoring_result.total_keywords) * 100
             session_data["scoring_details"] = {
-                "coverage_percentage": scoring_result.coverage_percentage,
-                "keyword_matches": {k: v.relevance_score for k, v in scoring_result.keyword_matches.items()},
-                "detailed_breakdown": scoring_result.detailed_breakdown,
+                "coverage_percentage": coverage,
+                "keyword_matches": {k: v.score for k, v in scoring_result.keyword_matches.items()},
+                "keywords_found": scoring_result.keywords_found,
+                "total_keywords": scoring_result.total_keywords,
                 "improvement_suggestions": self.keyword_analyzer.generate_improvement_suggestions(scoring_result, self.current_session.topic)
             }
         
@@ -356,13 +361,14 @@ class ConversationManager:
         """
         
         if scoring_result:
-            report += f"Topic Coverage: {scoring_result.coverage_percentage:.1f}%\n"
-            report += f"Keywords Mentioned: {len(scoring_result.keyword_matches)}\n"
+            coverage = (scoring_result.keywords_found / scoring_result.total_keywords) * 100
+            report += f"Topic Coverage: {coverage:.1f}%\n"
+            report += f"Keywords Mentioned: {scoring_result.keywords_found}\n"
             
             if scoring_result.keyword_matches:
                 report += "\n Topics You've Covered:\n"
                 for keyword, match in list(scoring_result.keyword_matches.items())[:5]:
-                    report += f"  • {keyword.title()}: {match.relevance_score:.1f} relevance\n"
+                    report += f"  • {keyword.title()}: {match.score:.1f} relevance\n"
             
             suggestions = self.keyword_analyzer.generate_improvement_suggestions(scoring_result, self.current_session.topic)
             if suggestions:

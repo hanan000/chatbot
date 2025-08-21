@@ -29,8 +29,8 @@ class SpeechHandler:
         self.rate = 16000
         
         # Initialize audio
-        pygame.mixer.init()
-        self.p = pyaudio.PyAudio()
+        # pygame.mixer.init()  # TTS disabled - pygame not needed
+        self.p = pyaudio.PyAudio()  # Still needed for STT recording
         
         LOG.info("Speech handler ready")
     
@@ -43,28 +43,34 @@ class SpeechHandler:
         Returns:
             threading.Thread: The thread handling audio playback
         """
-        def _speak():
-            try:
-                response = self.client.audio.speech.create(
-                    model="tts-1",
-                    voice="nova",  # Using nova voice which is clear English
-                    input=text
-                )
-                
-                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-                    response.stream_to_file(tmp.name)
-                    pygame.mixer.music.load(tmp.name)
-                    pygame.mixer.music.play()
-                    
-                    while pygame.mixer.music.get_busy():
-                        time.sleep(0.1)
-                    
-                    os.unlink(tmp.name)
-                    
-            except Exception as e:
-                LOG.error(f"TTS Error: {e}")
+        # TTS functionality commented out - only STT is active
+        # def _speak():
+        #     try:
+        #         response = self.client.audio.speech.create(
+        #             model="tts-1",
+        #             voice="nova",  # Using nova voice which is clear English
+        #             input=text
+        #         )
+        #         
+        #         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+        #             response.stream_to_file(tmp.name)
+        #             pygame.mixer.music.load(tmp.name)
+        #             pygame.mixer.music.play()
+        #             
+        #             while pygame.mixer.music.get_busy():
+        #                 time.sleep(0.1)
+        #             
+        #             os.unlink(tmp.name)
+        #             
+        #     except Exception as e:
+        #         LOG.error(f"TTS Error: {e}")
+        # 
+        # thread = threading.Thread(target=_speak, daemon=True)
+        # thread.start()
+        # return thread
         
-        thread = threading.Thread(target=_speak, daemon=True)
+        # Return a dummy thread that does nothing
+        thread = threading.Thread(target=lambda: None, daemon=True)
         thread.start()
         return thread
     
@@ -167,15 +173,15 @@ class SpeechHandler:
         """
         if prompt:
             LOG.info(f"\n{prompt}")
-            self.speak(prompt)
-            time.sleep(1)
+            # self.speak(prompt)  # TTS disabled - only showing prompt as text
+            # time.sleep(1)
         
         for attempt in range(1, 4):
             if attempt > 1:
                 retry_msg = f"Attempt {attempt}/3. Please try again."
                 LOG.info(retry_msg)
-                self.speak(retry_msg)
-                time.sleep(1)
+                # self.speak(retry_msg)
+                # time.sleep(1)
             
             result = self.listen_once(timeout)
             if result:
@@ -193,8 +199,9 @@ class SpeechHandler:
         LOG.info("Testing audio system...")
         
         try:
-            self.speak("Testing speech. Can you hear me?")
-            time.sleep(3)
+            # self.speak("Testing speech. Can you hear me?")  # TTS disabled
+            # time.sleep(3)
+            LOG.info("Testing speech. Can you hear me?")  # Show as text only
             
             result = self.get_speech_input(
                 "Say 'test successful' to verify:", 
@@ -215,7 +222,7 @@ class SpeechHandler:
     def cleanup(self):
         """Clean up audio resources."""
         try:
-            pygame.mixer.quit()
+            # pygame.mixer.quit()  # TTS disabled - pygame not used
             self.p.terminate()
         except:
             pass

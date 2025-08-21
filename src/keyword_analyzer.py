@@ -12,26 +12,26 @@ from src.utils import get_conf
 
 @dataclass
 class KeywordMatch:
-    """Simple keyword match result."""
+    """keyword match result."""
     keyword: Keyword
     found: bool
     score: float
 
 @dataclass
 class ScoringResult:
-    """Simple scoring result."""
+    """scoring result."""
     total_score: float
     keyword_matches: Dict[str, KeywordMatch]
     keywords_found: int
     total_keywords: int
 
 class KeywordAnalysis(BaseModel):
-    """Simple LangChain analysis output"""
+    """LangChain analysis output"""
     matched_keywords: List[str] = Field(description="List of keywords found in the text")
     relevance_scores: Dict[str, float] = Field(description="Relevance score for each keyword (0.0-1.0)")
 
 class KeywordAnalyzer:
-    """Simple keyword analyzer with basic AI assistance."""
+    """keyword analyzer with basic AI assistance."""
     
     def __init__(self):
         """Initialize the analyzer."""
@@ -40,7 +40,7 @@ class KeywordAnalyzer:
         self.setup_prompt_template()
     
     def setup_prompt_template(self):
-        """Simple prompt for keyword analysis."""
+        """prompt for keyword analysis."""
         template = """
         Find these keywords in the text: {keywords}
         
@@ -55,13 +55,13 @@ class KeywordAnalyzer:
         self.chain = self.prompt | self.llm | self.parser
     
     def check_keyword_in_text(self, text: str, keyword: str) -> bool:
-        """Simple keyword check."""
+        """keyword check."""
         text_lower = text.lower()
         keyword_lower = keyword.lower()
         return keyword_lower in text_lower
     
     def analyze_with_langchain(self, text: str, keywords: List[Keyword]) -> KeywordAnalysis:
-        """Simple AI analysis."""
+        """AI analysis."""
         try:
             keyword_terms = [kw.term for kw in keywords]
             
@@ -81,13 +81,13 @@ class KeywordAnalyzer:
             )
     
     def find_keyword_matches(self, text: str, keywords: List[Keyword]) -> Dict[str, KeywordMatch]:
-        """Find keyword matches using simple text search and AI scoring."""
+        """Find keyword matches using text search and AI scoring."""
         
         ai_analysis = self.analyze_with_langchain(text, keywords)
         matches = {}
         
         for keyword in keywords:
-            # Simple text search
+            # text search
             found = self.check_keyword_in_text(text, keyword.term)
             
             # Get AI score
@@ -97,9 +97,9 @@ class KeywordAnalyzer:
             if keyword.term in ai_analysis.matched_keywords and not found:
                 found = True
             
-            # Calculate simple score
+            # Calculate score
             if found:
-                score = max(0.5, ai_score)  # At least 0.5 if found
+                score = max(0.0, ai_score)
             else:
                 score = ai_score  # Use AI score if not directly found
             
@@ -113,11 +113,11 @@ class KeywordAnalyzer:
         return matches
     
     def calculate_score(self, text: str, topic: Topic) -> ScoringResult:
-        """Simple scoring calculation."""
+        """scoring calculation."""
         
         matches = self.find_keyword_matches(text, topic.keywords)
         
-        # Simple scoring: average of all keyword scores
+
         if matches:
             total_score = (sum(match.score for match in matches.values()) / len(topic.keywords)) * 100
         else:
@@ -145,14 +145,14 @@ class KeywordAnalyzer:
         return list(all_terms - found_terms)
     
     def generate_improvement_suggestions(self, scoring_result: ScoringResult, topic: Topic) -> List[str]:
-        """Simple suggestions."""
+        """suggestions."""
         suggestions = []
         
         missing = self.get_missing_keywords(scoring_result, topic)
         if missing:
             suggestions.append(f"Try discussing: {', '.join(missing[:3])}")
         
-        if scoring_result.keywords_found < scoring_result.total_keywords / 2:
-            suggestions.append(f"Cover more topics - you've discussed {scoring_result.keywords_found} out of {scoring_result.total_keywords}")
+        #if scoring_result.keywords_found < scoring_result.total_keywords / 2:
+            #suggestions.append(f"Cover more topics - you've discussed {scoring_result.keywords_found} out of {scoring_result.total_keywords}")
         
         return suggestions

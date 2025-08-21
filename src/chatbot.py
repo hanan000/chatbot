@@ -8,8 +8,7 @@ from config.config import get_random_topic, TOPICS_CONFIG
 
 
 class RolePlayChatbot:
-    """
-    Simple AI chatbot for educational conversations with scoring.
+    """AI chatbot for educational conversations with scoring.
     """
     
     def __init__(self, api_key: str, model: str, use_speech: bool = True):
@@ -38,6 +37,26 @@ class RolePlayChatbot:
             LOG.info(f"  {i}. {topic.name}")
         LOG.info(f"  {len(TOPICS_CONFIG) + 1}. Random Topic")
     
+    def _convert_word_to_number(self, word):
+        """Convert spoken number words to digits.
+        
+        Args:
+            word (str): The word to convert
+            
+        Returns:
+            int: The numeric value, or None if conversion fails
+        """
+        word_to_num = {
+            'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 
+            'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9,
+            'ten': 10, 'eleven': 11, 'twelve': 12, 'thirteen': 13, 
+            'fourteen': 14, 'fifteen': 15, 'sixteen': 16, 'seventeen': 17,
+            'eighteen': 18, 'nineteen': 19, 'twenty': 20
+        }
+        
+        word_lower = word.lower().strip()
+        return word_to_num.get(word_lower)
+
     def get_topic(self):
         """Get user's topic selection via speech or text input.
 
@@ -64,7 +83,9 @@ class RolePlayChatbot:
             if 1 <= num <= len(TOPICS_CONFIG):
                 return list(TOPICS_CONFIG.values())[num - 1]
         except ValueError:
-            pass
+            num = self._convert_word_to_number(choice)
+            if num is not None and 1 <= num <= len(TOPICS_CONFIG):
+                return list(TOPICS_CONFIG.values())[num - 1]
             
         LOG.warning("Invalid topic selection")
         return None

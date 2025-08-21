@@ -127,8 +127,8 @@ def main():
     
     parser.add_argument(
         "--model",
-        default="gpt-3.5-turbo",
-        help="OpenAI model to use (default: gpt-3.5-turbo)"
+        default=get_conf('MODEL_NAME'),
+        help="OpenAI model to use (default: gpt-4.1-nano)"
     )
     
     parser.add_argument(

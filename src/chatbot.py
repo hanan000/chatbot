@@ -1,137 +1,101 @@
 import time
-from typing import Optional, Dict, Tuple
 
 from src.logger import LOG
 from src.speech_handler import SpeechHandler
 from src.llm_client import LLMClient
 from src.conversation_manager import ConversationManager
-from config.config import Topic, get_random_topic, TOPICS_CONFIG
+from config.config import get_random_topic, TOPICS_CONFIG
 
 
 class RolePlayChatbot:
+    """AI chatbot for educational conversations with scoring.
     """
-    An AI-powered conversational chatbot that engages users in role-playing conversations.
-    
-    This chatbot supports both speech and text modes, allows topic selection, manages
-    conversation sessions, and provides scoring and feedback on user responses.
-    
-    Attributes:
-        speech_handler (SpeechHandler): Handles speech input/output (optional).
-        llm_client (LLMClient): Manages communication with the language model.
-        conversation_manager (ConversationManager): Tracks conversation state and scoring.
-        use_speech (bool): Whether speech functionality is enabled.
-        current_topic (Topic): The current conversation topic.
-        is_running (bool): Whether a conversation session is active.
-    """
-    DEFAULT_TIMEOUT = 15.0
-    RETRY_TIMEOUT = 10.0
-    PROGRESS_REPORT_INTERVAL = 1
     
     def __init__(self, api_key: str, model: str, use_speech: bool = True):
-        """
-        Initialize the RolePlayChatbot.
+        """Initialize the chatbot with API credentials and speech settings.
         
         Args:
-            api_key (str): API key for the language model service.
-            model (str): Model name to use for the language model.
-            use_speech (bool): Whether to enable speech functionality. Defaults to True.
-            
-        Raises:
-            ValueError: If api_key or model is empty or None.
+            api_key: OpenAI API key for LLM access
+            model: Model name to use (e.g., 'gpt-3.5-turbo')
+            use_speech: Enable speech input/output functionality
         """
-        if not api_key or not api_key.strip():
-            raise ValueError("API key cannot be empty or None")
-        if not model or not model.strip():
-            raise ValueError("Model cannot be empty or None")
-
         self.speech_handler = SpeechHandler() if use_speech else None
         self.llm_client = LLMClient(api_key, model)
         self.conversation_manager = ConversationManager()
         self.use_speech = use_speech
-        self.current_topic: Optional[Topic] = None
-        self.is_running = False
+        self.current_topic = None
+        LOG.info("AI Chatbot initialized")
+    
         
-        LOG.info("AI Chatbot initialized......")
+    def show_topics(self):
+        """Display all available conversation topics to the user.
         
-    def display_available_topics(self):
+        Shows a numbered list of available topics plus random option.
         """
-        Display all available conversation topics to the user.
-        
-        Shows numbered list of topics with descriptions and includes random option.
-        """
-        LOG.info(" Available Topics:")
-        for i, (key, topic) in enumerate(TOPICS_CONFIG.items(), 1):
+        LOG.info("Available Topics:")
+        for i, topic in enumerate(TOPICS_CONFIG.values(), 1):
             LOG.info(f"  {i}. {topic.name}")
-            LOG.info(f"     {topic.description}")
         LOG.info(f"  {len(TOPICS_CONFIG) + 1}. Random Topic")
     
-    def select_topic(self) -> Optional[Topic]:
-        """
-        Allow user to select a conversation topic via speech or text input.
+    def _convert_word_to_number(self, word):
+        """Convert spoken number words to digits.
         
+        Args:
+            word (str): The word to convert
+            
         Returns:
-            Optional[Topic]: Selected topic object, or None if selection failed.
+            int: The numeric value, or None if conversion fails
         """
-        self.display_available_topics()
+        word_to_num = {
+            'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 
+            'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9,
+            'ten': 10, 'eleven': 11, 'twelve': 12, 'thirteen': 13, 
+            'fourteen': 14, 'fifteen': 15, 'sixteen': 16, 'seventeen': 17,
+            'eighteen': 18, 'nineteen': 19, 'twenty': 20
+        }
         
-        choice = self._get_topic_choice()
-        if not choice:
-            LOG.debug("No topic selected.")
-            return None
-        
-        return self._parse_topic_choice(choice)
-    
-    def _get_topic_choice(self) -> Optional[str]:
-        """
-        Get user's topic choice via speech or text input.
-        
+        word_lower = word.lower().strip()
+        return word_to_num.get(word_lower)
+
+    def get_topic(self):
+        """Get user's topic selection via speech or text input.
+
         Returns:
-            Optional[str]: User's choice, or None if no input received.
+            Topic: Selected topic object, or None if selection failed
         """
+        self.show_topics()
+        
         if self.use_speech:
-            prompt = "Please say the number of the topic you'd like to discuss, or say 'random' for a random topic."
-            return self.speech_handler.get_speech_input(prompt, timeout=self.DEFAULT_TIMEOUT)
+            choice = self.speech_handler.get_speech_input(
+                "Say the number of the topic you'd like to discuss", timeout=15
+            )
         else:
-            return input(f"Enter topic number (1-{len(TOPICS_CONFIG) + 1}) or 'random': ").strip()
-    
-    def _parse_topic_choice(self, choice: str) -> Optional[Topic]:
-        """
-        Parse user's topic choice and return corresponding topic.
+            choice = input("Enter topic number: ").strip()
         
-        Args:
-            choice (str): User's input choice.
-            
-        Returns:
-            Optional[Topic]: Selected topic, or None if invalid choice.
-        """
-        choice = choice.lower().strip()
-        
-        if 'random' in choice or choice == str(len(TOPICS_CONFIG) + 1):
-            topic = get_random_topic()
-            LOG.info(f"Random topic selected: {topic.name}")
-            return topic
-        
-        try:
-            topic_num = int(''.join(filter(str.isdigit, choice)))
-            if 1 <= topic_num <= len(TOPICS_CONFIG):
-                topic = list(TOPICS_CONFIG.values())[topic_num - 1]
-                LOG.info(f"Selected topic: {topic.name}")
-                return topic
-            else:
-                LOG.warning(f"Invalid topic number. Please choose 1-{len(TOPICS_CONFIG) + 1}")
-                return None
-        except (ValueError, IndexError, TypeError) as e:
-            LOG.error(f"Invalid input for topic selection: {e}")
+        if not choice:
             return None
+            
+        if 'random' in choice.lower() or choice == str(len(TOPICS_CONFIG) + 1):
+            return get_random_topic()
+            
+        try:
+            num = int(choice)
+            if 1 <= num <= len(TOPICS_CONFIG):
+                return list(TOPICS_CONFIG.values())[num - 1]
+        except ValueError:
+            num = self._convert_word_to_number(choice)
+            if num is not None and 1 <= num <= len(TOPICS_CONFIG):
+                return list(TOPICS_CONFIG.values())[num - 1]
+            
+        LOG.warning("Invalid topic selection")
+        return None
     
-    def initialize_conversation(self, topic: Topic):
-        """
-        Initialize a new conversation session with the given topic.
+    
+    def start_conversation(self, topic):
+        """Initialize a new conversation session with the given topic.
         
         Args:
-            topic (Topic): The topic to use for the conversation.
-            
-        Sets up the LLM persona, starts session tracking, and delivers opening message.
+            topic: Topic object containing keywords and introduction
         """
         self.current_topic = topic
         self.conversation_manager.start_new_session(topic)
@@ -139,176 +103,146 @@ class RolePlayChatbot:
         persona_prompt = self.llm_client.create_roleplay_persona(topic)
         self.llm_client.set_system_prompt(persona_prompt)
         
-        LOG.info(f" Starting conversation about: {topic.name}")
-        LOG.info(f"Topic: {topic.description}")
+        LOG.info(f"Starting conversation: {topic.name}")
         
-        opening_message = topic.introduction
-        self._deliver_message(opening_message)
-        self.conversation_manager.add_turn("assistant", opening_message)
+        self.send_message(topic.introduction)
+        self.conversation_manager.add_turn("assistant", topic.introduction)
     
-    def _deliver_message(self, message: str):
-        """
-        Deliver a message to the user via text log and optionally speech.
+    def send_message(self, message):
+        """Send a message to the user via text log and optionally speech.
         
         Args:
-            message (str): The message to deliver.
+            message (str): Message to deliver to user
         """
-        LOG.info(f" AI: {message}")
+        LOG.info(f"AI: {message}")
         if self.use_speech and self.speech_handler:
             self.speech_handler.speak(message)
             time.sleep(0.5)
     
-    def _get_user_input(self) -> Optional[str]:
-        """
-        Get user input via speech or text.
-        
+    def get_user_input(self):
+        """Get user input via speech or text.
+
         Returns:
-            Optional[str]: User input string, or None if interrupted.
+            str: User input string, or None if interrupted
         """
         if self.use_speech and self.speech_handler:
-            return self.speech_handler.get_speech_input("", timeout=self.DEFAULT_TIMEOUT)
+            return self.speech_handler.get_speech_input("", timeout=15)
         else:
             try:
-                return input(" USER: ").strip()
+                return input("USER INPUT: ").strip()
             except KeyboardInterrupt:
                 return None
     
-    def handle_user_response(self, user_input: str) -> bool:
-        """
-        Process user input and generate appropriate response.
-        
+    def handle_response(self, user_input):
+        """Process user input and generate appropriate AI response.
+
         Args:
-            user_input (str): The user's input message.
-            
+            user_input (str): The user's input message
+
         Returns:
-            bool: True if conversation should continue, False if it should end.
+            bool: True if conversation should continue, False if it should end
         """
         if not user_input:
             return True
         
         LOG.info(f"USER: {user_input}")
         
-        score = self.conversation_manager.add_turn("user", user_input)
+        self.conversation_manager.add_turn("user", user_input)
+        current_score, _ = self.conversation_manager.get_current_score()
         
-        current_score, scoring_result = self.conversation_manager.get_current_score()
-        
-        if len([t for t in self.conversation_manager.current_session.turns if t.speaker == "user"]) % self.PROGRESS_REPORT_INTERVAL == 0:
-            progress = self.conversation_manager.generate_progress_report()
-            LOG.info(f"{progress}")
-
         should_continue, reason = self.conversation_manager.should_continue_conversation()
         
         if not should_continue:
-            final_response = f"That's a great discussion! {reason}Thank you for sharing your insights about {self.current_topic.name}!"
-            self._deliver_message(final_response)
+            final_message = f"Great discussion! {reason}Thanks for talking about {self.current_topic.name}!"
+            self.send_message(final_message)
             return False
 
         try:
-            if scoring_result:
-                llm_response = self.llm_client.generate_follow_up_question(
-                    self.current_topic, user_input, current_score
-                )
-            else:
-                llm_response = self.llm_client.generate_response(user_input)
+            llm_response = self.llm_client.generate_follow_up_question(
+                self.current_topic, user_input, current_score
+            )
             
             if llm_response:
-                self._deliver_message(llm_response)
+                self.send_message(llm_response)
                 self.conversation_manager.add_turn("assistant", llm_response)
             else:
                 fallback = "That's interesting! Can you tell me more about what you think influences this the most?"
-                self._deliver_message(fallback)
+                self.send_message(fallback)
                 self.conversation_manager.add_turn("assistant", fallback)
                 
         except Exception as e:
-            LOG.error(f"Error generating response: {e}")
-            fallback = "I'd love to hear more about your thoughts on this topic!"
-            self._deliver_message(fallback)
+            LOG.error(f"Error: {e}")
+            self.send_message("I'd love to hear more about your thoughts on this topic!")
 
         return True
     
     def run_conversation(self):
-        """
-        Main conversation loop that handles topic selection and user interaction.
+        """Main conversation loop handling topic selection and user interaction.
         
-        Manages the complete conversation flow including topic selection,
+        Manages complete conversation flow including topic selection,
         initialization, user interaction loop, and session cleanup.
         """
-        LOG.info("Welcome to the AI-Powered Speech Chatbot!")
-        LOG.info("This chatbot will engage you in role-playing conversations and score your responses.")
+        LOG.info("Welcome to the AI Chatbot!")
         
-        if self.use_speech:
-            if not self.speech_handler.test_audio_system():
-                LOG.error("Audio system test failed. Switching to text mode.")
-                self.use_speech = False
+        if self.use_speech and not self.speech_handler.test_audio_system():
+            LOG.error("Audio test failed. Using text mode.")
+            self.use_speech = False
         
         if not self.llm_client.test_connection():
-            LOG.error("Cannot connect to LLM service. Please check your API key and internet connection.")
+            LOG.error("Cannot connect to AI service.")
             return
         
         while True:
-            topic = self.select_topic()
+            topic = self.get_topic()
             if not topic:
-                if self._ask_retry("Invalid topic selection. Would you like to try again?"):
+                if self.ask_yes_no("Try again?"):
                     continue
                 else:
                     break
             
-            self.initialize_conversation(topic)
-            self.is_running = True
-            conversation_count = 0
+            self.start_conversation(topic)
             
             try:
-                while self.is_running:
-                    user_input = self._get_user_input()
+                while True:
+                    user_input = self.get_user_input()
                     
-                    if user_input is None:
-                        LOG.exception("Conversation interrupted by user.")
+                    if not user_input:
                         break
                     
-                    # Check if any exit words are contained in the user input
                     exit_words = ['quit', 'exit', 'stop', 'end']
-                    user_input_clean = user_input.lower().strip()
-                    if any(word in user_input_clean for word in exit_words):
-                        LOG.info("Ending conversation as requested.")
+                    if any(word in user_input.lower() for word in exit_words):
+                        LOG.info("Conversation ended.")
                         break
                     
-                    if not user_input.strip():
-                        LOG.error(" No input received. Please try speaking again.")
-                        continue
-                    
-                    conversation_count += 1
-                    should_continue = self.handle_user_response(user_input)
-                    
-                    if not should_continue:
-                        self.is_running = False
+                    if not self.handle_response(user_input):
+                        break
                         
             except KeyboardInterrupt:
-                LOG.exception("Conversation interrupted by user.")
+                LOG.info("Interrupted by user.")
             except Exception as e:
-                LOG.error(f"An error occurred: {e}")
+                LOG.error(f"Error: {e}")
             
             session_data = self.conversation_manager.end_session()
-            self.display_final_results(session_data)
+            self.show_results(session_data)
             
-            if not self._ask_retry("Would you like to start a new conversation on a different topic?"):
+            if not self.ask_yes_no("Start new conversation?"):
                 break
         
-        LOG.info("Thank you for using the AI Chatbot! Goodbye!")
+        LOG.info("Goodbye!")
         if self.use_speech and self.speech_handler:
             self.speech_handler.cleanup()
     
-    def _ask_retry(self, question: str) -> bool:
-        """
-        Ask user a yes/no question via speech or text.
+    def ask_yes_no(self, question):
+        """Ask user a yes/no question via speech or text.
         
         Args:
-            question (str): The question to ask the user.
+            question (str): Question to ask the user
             
         Returns:
-            bool: True if user answered affirmatively, False otherwise.
+            bool: True if user answered affirmatively, False otherwise
         """
         if self.use_speech and self.speech_handler:
-            response = self.speech_handler.get_speech_input(f"{question} Say 'yes' or 'no'.", timeout=self.RETRY_TIMEOUT)
+            response = self.speech_handler.get_speech_input(f"{question} Say yes or no.", timeout=10)
         else:
             response = input(f"{question} (y/n): ").strip().lower()
         
@@ -317,47 +251,32 @@ class RolePlayChatbot:
         
         return 'yes' in response.lower() or response.lower() in ['y', 'yeah', 'yep', 'sure']
     
-    def display_final_results(self, session_data: Optional[Dict]):
-        """
-        Display comprehensive results from a completed conversation session.
+    def show_results(self, session_data):
+        """Display conversation results and scoring information.
         
         Args:
-            session_data (Optional[Dict]): Session data containing scores,
-                                          keywords, and performance metrics.
+            session_data (dict): Session data containing scores and metrics
         """
         if not session_data:
-            LOG.debug(" No session data available.")
             return
 
-        LOG.info("📊 FINAL CONVERSATION RESULTS")
-        
+        LOG.info("CONVERSATION RESULTS")
         LOG.info(f"Topic: {session_data['topic']}")
         LOG.info(f"Duration: {session_data['duration_minutes']:.1f} minutes")
-        LOG.info(f"Your responses: {session_data['user_turns']}")
-        LOG.info(f"Total words: {session_data['total_user_words']}")
-        LOG.info(f"Final Score: {session_data['final_score']:.1f}/100")
+        LOG.info(f"Score: {session_data['final_score']:.1f}/100")
         
         if 'scoring_details' in session_data:
             details = session_data['scoring_details']
-            LOG.info(f"Topic Coverage: {details['coverage_percentage']:.1f}%")
-            LOG.info(f"Keywords mentioned: {len(details['keyword_matches'])}")
-            
             if details['keyword_matches']:
-                LOG.info("Topics you covered:")
-                for keyword, relevance in list(details['keyword_matches'].items())[:5]:
-                    LOG.info(f"  • {keyword.title()}: {relevance:.1f} relevance")
-            
-            if details['improvement_suggestions']:
-                LOG.info("Areas for improvement:")
-                for suggestion in details['improvement_suggestions']:
-                    LOG.info(f"  • {suggestion}")
+                LOG.info("Topics covered:")
+                for keyword in list(details['keyword_matches'].keys())[:3]:
+                    LOG.info(f"  • {keyword.title()}")
 
     
     def run_text_only_mode(self):
-        """
-        Run the chatbot in text-only mode without speech functionality.
+        """Run the chatbot in text-only mode without speech functionality.
         
-        Disables speech handlers and runs the conversation in text mode only.
+        Disables speech handlers and runs conversation in text mode only.
         """
         LOG.info("Running in text-only mode (no speech)")
         self.use_speech = False

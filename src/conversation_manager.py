@@ -74,6 +74,52 @@ class ConversationManager:
         if save_conversations:
             self.conversations_dir.mkdir(exist_ok=True)
     
+    def _get_user_turns(self) -> List[ConversationTurn]:
+        """Get all user turns from the current session.
+        
+        Returns:
+            List of user conversation turns, empty if no active session
+        """
+        if not self.current_session:
+            return []
+        return [t for t in self.current_session.turns if t.speaker == "user"]
+    
+    def _get_user_messages(self) -> List[str]:
+        """Get user message content from all turns.
+        
+        Returns:
+            List of user message strings
+        """
+        return [t.content for t in self._get_user_turns()]
+    
+    def _calculate_session_duration(self) -> timedelta:
+        """Calculate duration of the current session.
+        
+        Returns:
+            Timedelta object representing session duration
+        """
+        if not self.current_session:
+            return timedelta(0)
+        return datetime.now() - self.current_session.start_time
+    
+    def _get_scoring_data(self) -> Tuple[float, Optional[ScoringResult], float]:
+        """Get current score, result, and coverage percentage.
+        
+        Returns:
+            Tuple of (score, scoring_result, coverage_percentage)
+        """
+        if not self.current_session:
+            return 0.0, None, 0.0
+        
+        user_messages = self._get_user_messages()
+        if not user_messages:
+            return 0.0, None, 0.0
+            
+        scoring_result = self.keyword_analyzer.analyze_conversation(user_messages, self.current_session.topic)
+        coverage = (scoring_result.keywords_found / scoring_result.total_keywords) * 100 if scoring_result.total_keywords > 0 else 0.0
+        
+        return scoring_result.total_score, scoring_result, coverage
+    
     def start_new_session(self, topic: Topic) -> str:
         """Start a new conversation session for the given topic.
         
@@ -118,16 +164,15 @@ class ConversationManager:
         )
         
         if speaker == "user":
-            user_turns = [t.content for t in self.current_session.turns if t.speaker == "user"] + [content]
-            scoring_result = self.keyword_analyzer.analyze_conversation(user_turns, self.current_session.topic)
+            user_messages = self._get_user_messages() + [content]
+            scoring_result = self.keyword_analyzer.analyze_conversation(user_messages, self.current_session.topic)
             
             turn.score = scoring_result.total_score
-            turn.keyword_matches = {k: v.relevance_score for k, v in scoring_result.keyword_matches.items()}
+            turn.keyword_matches = {k: v.score for k, v in scoring_result.keyword_matches.items()}
             
             self.current_session.total_user_words += len(content.split())
         
         self.current_session.turns.append(turn)
-        
         return turn.score
     
     def get_current_score(self) -> Tuple[float, ScoringResult]:
@@ -137,15 +182,8 @@ class ConversationManager:
             Tuple of (score, scoring_result) where score is 0-100 and
             scoring_result contains detailed analysis
         """
-        if not self.current_session:
-            return 0.0, None
-        
-        user_turns = [t.content for t in self.current_session.turns if t.speaker == "user"]
-        if not user_turns:
-            return 0.0, None
-            
-        scoring_result = self.keyword_analyzer.analyze_conversation(user_turns, self.current_session.topic)
-        return scoring_result.total_score, scoring_result
+        score, scoring_result, _ = self._get_scoring_data()
+        return score, scoring_result
     
     def get_conversation_context(self, max_turns: int = 6) -> List[Dict[str, str]]:
         """Get recent conversation turns formatted for context.
@@ -180,12 +218,9 @@ class ConversationManager:
         if not self.current_session:
             return "No active conversation"
         
-        user_turns = [t.content for t in self.current_session.turns if t.speaker == "user"]
-        assistant_turns = [t.content for t in self.current_session.turns if t.speaker == "assistant"]
-        
-        current_score, scoring_result = self.get_current_score()
-        
-        duration = datetime.now() - self.current_session.start_time
+        user_turns = self._get_user_turns()
+        duration = self._calculate_session_duration()
+        current_score, scoring_result, coverage = self._get_scoring_data()
 
         summary = f"""
         Conversation Summary - Session: {self.current_session.session_id}
@@ -194,12 +229,11 @@ class ConversationManager:
         Total turns: {len(self.current_session.turns)}
         User responses: {len(user_turns)}
         Current score: {current_score:.1f}/100
-        Total user words: {self.current_session.total_user_words}
-        """
+        Total user words: {self.current_session.total_user_words}"""
         
         if scoring_result:
-            summary += f"Topic coverage: {scoring_result.coverage_percentage:.1f}%\n"
-            summary += f"Keywords mentioned: {len(scoring_result.keyword_matches)}/{len(self.current_session.topic.keywords)}\n"
+            summary += f"\nTopic coverage: {coverage:.1f}%"
+            summary += f"\nKeywords mentioned: {scoring_result.keywords_found}/{scoring_result.total_keywords}"
         
         return summary.strip()
     
@@ -213,25 +247,27 @@ class ConversationManager:
         if not self.current_session:
             return False, "No active session"
         
-        user_turns = [t for t in self.current_session.turns if t.speaker == "user"]
+        user_turns = self._get_user_turns()
         
         if len(user_turns) < 2:
             return True, "Continue - need more user input"
         
-        current_score, scoring_result = self.get_current_score()
+        current_score, scoring_result, coverage = self._get_scoring_data()
+        duration = self._calculate_session_duration()
         
+        # Check stopping conditions
         if current_score >= 80:
             return False, f"Excellent coverage achieved! Score: {current_score:.1f}/100"
         
         if len(user_turns) >= 8:
             return False, f"Conversation has reached good length. Final score: {current_score:.1f}/100"
         
-        duration = datetime.now() - self.current_session.start_time
         if duration > timedelta(minutes=10):
             return False, f"Time limit reached. Final score: {current_score:.1f}/100"
         
-        if scoring_result and scoring_result.coverage_percentage >= 60:
-            return True, f"Good progress - {scoring_result.coverage_percentage:.1f}% coverage"
+        # Continue with progress feedback
+        if coverage >= 60:
+            return True, f"Good progress - {coverage:.1f}% coverage"
         
         return True, "Continue conversation"
     
@@ -245,18 +281,42 @@ class ConversationManager:
             return None
         
         self.current_session.end_time = datetime.now()
-        final_score, scoring_result = self.get_current_score()
+        final_score, scoring_result, coverage = self._get_scoring_data()
         self.current_session.final_score = final_score
+        
+        session_data = self._build_session_data(final_score, scoring_result, coverage)
+        
+        if self.save_conversations:
+            self.save_session(session_data)
+        
+        LOG.info(f"Session ended. Final score: {final_score:.1f}/100")
+        
+        self.current_session = None
+        return session_data
+    
+    def _build_session_data(self, final_score: float, scoring_result: Optional[ScoringResult], coverage: float) -> Dict:
+        """Build complete session data dictionary.
+        
+        Args:
+            final_score: Final conversation score (0-100)
+            scoring_result: Detailed scoring analysis results
+            coverage: Topic coverage percentage
+            
+        Returns:
+            Dictionary containing all session data for saving/export
+        """
+        user_turns = self._get_user_turns()
+        duration = self.current_session.end_time - self.current_session.start_time
         
         session_data = {
             "session_id": self.current_session.session_id,
             "topic": self.current_session.topic.name,
             "start_time": self.current_session.start_time.isoformat(),
             "end_time": self.current_session.end_time.isoformat(),
-            "duration_minutes": (self.current_session.end_time - self.current_session.start_time).total_seconds() / 60,
+            "duration_minutes": duration.total_seconds() / 60,
             "final_score": final_score,
             "total_turns": len(self.current_session.turns),
-            "user_turns": len([t for t in self.current_session.turns if t.speaker == "user"]),
+            "user_turns": len(user_turns),
             "total_user_words": self.current_session.total_user_words,
             "turns": [
                 {
@@ -271,21 +331,14 @@ class ConversationManager:
         
         if scoring_result:
             session_data["scoring_details"] = {
-                "coverage_percentage": scoring_result.coverage_percentage,
-                "keyword_matches": {k: v.relevance_score for k, v in scoring_result.keyword_matches.items()},
-                "detailed_breakdown": scoring_result.detailed_breakdown,
+                "coverage_percentage": coverage,
+                "keyword_matches": {k: v.score for k, v in scoring_result.keyword_matches.items()},
+                "keywords_found": scoring_result.keywords_found,
+                "total_keywords": scoring_result.total_keywords,
                 "improvement_suggestions": self.keyword_analyzer.generate_improvement_suggestions(scoring_result, self.current_session.topic)
             }
         
-        if self.save_conversations:
-            self.save_session(session_data)
-        
-        LOG.info(f"Session ended. Final score: {final_score:.1f}/100")
-        
-        session_summary = session_data
-        self.current_session = None
-        
-        return session_summary
+        return session_data
     
     def save_session(self, session_data: Dict):
         """Save session data to a JSON file.
@@ -346,28 +399,28 @@ class ConversationManager:
         if not self.current_session:
             return "No active conversation to report on."
         
-        current_score, scoring_result = self.get_current_score()
-        user_turns = [t for t in self.current_session.turns if t.speaker == "user"]
+        current_score, scoring_result, coverage = self._get_scoring_data()
+        user_turns = self._get_user_turns()
         
-        report = f"""
-        PROGRESS REPORT
-        Current Score: {current_score:.1f}/100
-        Responses Given: {len(user_turns)}
-        """
+        report = f"""PROGRESS REPORT
+            Current Score: {current_score:.1f}/100
+            Responses Given: {len(user_turns)}"""
         
         if scoring_result:
-            report += f"Topic Coverage: {scoring_result.coverage_percentage:.1f}%\n"
-            report += f"Keywords Mentioned: {len(scoring_result.keyword_matches)}\n"
+            report += f"\nTopic Coverage: {coverage:.1f}%"
+            report += f"\nKeywords Mentioned: {scoring_result.keywords_found}"
             
+            # Add covered topics
             if scoring_result.keyword_matches:
-                report += "\n Topics You've Covered:\n"
+                report += "\n\nTopics You've Covered:"
                 for keyword, match in list(scoring_result.keyword_matches.items())[:5]:
-                    report += f"  • {keyword.title()}: {match.relevance_score:.1f} relevance\n"
+                    report += f"\n  • {keyword.title()}: {match.score:.1f} relevance"
             
+            # Add suggestions
             suggestions = self.keyword_analyzer.generate_improvement_suggestions(scoring_result, self.current_session.topic)
             if suggestions:
-                report += "\n Suggestions:\n"
+                report += "\n\nSuggestions:"
                 for suggestion in suggestions[:2]:
-                    report += f"  • {suggestion}\n"
+                    report += f"\n  • {suggestion}"
         
-        return report.strip()
+        return report
